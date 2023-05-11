@@ -1,4 +1,34 @@
-import accessible_output2.outputs.auto, panda3d, threading, time, sys
+import importlib, os, subprocess, sys, time
+
+libs=["panda3d","pyttsx3","accessible_output2"]
+
+for lib in libs:
+	try:
+		print(f"Importing module {lib}")
+		importlib.import_module(lib)
+		
+		
+		print(f"Module {lib} imported successfully.")
+	except ImportError as e:
+		print(f"Missing library: {e.name}. Installing it for you right now...")
+		subprocess.check_call(["pip", "install", "--user", e.name])
+		importlib.invalidate_caches()
+		print("Waiting for library to be installed...")
+		for i in range(10):
+			try:
+				importlib.import_module(e.name)
+				break
+			except ImportError:
+				time.sleep(3)
+		else:
+			raise Exception("Unable to import library after installation")
+			
+		
+	
+
+print("All required libraries imported successfully.")
+
+from vocaliser import *
 from direct.interval.LerpInterval import LerpPosInterval
 from panda3d.core import Point3
 from direct.task import Task
@@ -30,7 +60,7 @@ class Game(ShowBase):
 		self.disableMouse()
 		
 		#loading controller of the tts
-		self.speak=accessible_output2.outputs.auto.Auto()
+		self.speak=vocaliser()
 		
 		#loading the audio kernel
 		self.audio3d = Audio3DManager(base.sfxManagerList[0], camera)
@@ -73,9 +103,10 @@ class Game(ShowBase):
 		#creating the bird with his coordinates.
 		self.bird=NodePath("Bird")
 		self.bird.reparentTo(self.env)
-		self.bird.setPos(Vec3(8, 0, 1))
+		self.bird.setPos(Vec3(-9, 0, 1))
 		self.bird_direction="r"
 		self.bird_is_eating=False
+		self.bird_speed=0.5
 		
 		#importing the required noises.
 		#background noise
@@ -90,20 +121,22 @@ class Game(ShowBase):
 		
 		#throwing a seed:
 		self.throw_sound=self.audio3d.loadSfx('seed.wav')
-		self.superthrow_sound=self.audio3d.loadSfx('superseedthrow.wav')
-		self.superload_sound=self.audio3d.loadSfx('superseedload.wav')
+		self.superthrow_sound=self.audio3d.loadSfx('superthrow.wav')
+		self.superload_sound=self.audio3d.loadSfx('superload.wav')
 		
 		#bird eat a seed:
 		self.catch_sound=self.audio3d.loadSfx('catch.wav')
-		self.supercatch_sound=self.audio3d.loadSfx('superseedcatch.wav')
+		self.supercatch_sound=self.audio3d.loadSfx('supercatch.wav')
 		
 		#throwing the seed in the wrong direction:
 		self.miss_sound=self.audio3d.loadSfx('miss.wav')
-		self.supermiss_sound=self.audio3d.loadSfx('superseedmiss.wav')
+		self.supermiss_sound=self.audio3d.loadSfx('supermiss.wav')
 		
 		#loop of the bird:
 		self.bird_sound=self.audio3d.loadSfx('bird.wav')
 		self.birdland_sound=self.audio3d.loadSfx('birdland.wav')
+		self.birdsleeping_sound=self.audio3d.loadSfx('birdsleeping.wav')
+		
 		
 		#baloon blowing up:
 		self.blow_sound=self.audio3d.loadSfx('blowup.wav')
@@ -143,10 +176,12 @@ class Game(ShowBase):
 		
 		#link noise to the bird
 		self.bird_sound.setLoop(True)
+		self.birdsleeping_sound.setLoop(True)
 		self.audio3d.attachSoundToObject(self.bird_sound, self.bird)
 		self.audio3d.attachSoundToObject(self.birdland_sound, self.bird)
 		self.audio3d.attachSoundToObject(self.catch_sound, self.bird)
 		self.audio3d.attachSoundToObject(self.supercatch_sound, self.bird)
+		self.audio3d.attachSoundToObject(self.birdsleeping_sound, self.bird)
 		
 		#modeling a baloon to push the bird up
 		self.baloon=NodePath("baloon")
@@ -180,6 +215,8 @@ class Game(ShowBase):
 		
 		self.overcopter=None
 		self.superseed_armed=False
+		self.superseed_used=False
+	
 	
 	def gameover(self,task):
 		first=Point3(10,-10,20)
@@ -189,6 +226,7 @@ class Game(ShowBase):
 		waydown=Point3(-5,5,6)
 		land=Point3(0,3,0)
 		if(self.overcopter==None):
+			self.bird_sound.stop()
 			self.speak.output("appearing")
 			self.overcopter=NodePath("overcoper")
 			self.overcopter.reparentTo(self.env)
@@ -200,83 +238,85 @@ class Game(ShowBase):
 			self.audio3d.attachSoundToObject(self.pgf_sound, self.overcopter)
 			
 			self.gameover_sound.play()
-			return task.cont
+			self.birdsleeping_sound.play()
+			return task.again
 			
 		
 		#first aproaching
-		while(self.overcopter.getX()<10) and (self.overcopter.getY()==-10) and (self.overcopter_step==0):
-			self.speak.output("step 1")
-			self.overcopter.set_x(self.overcopter,0.1)
+		if(self.overcopter.getX()<=10) and (self.overcopter.getY()==-10) and (self.overcopter_step==0):
+			print(str(self.overcopter.getX())+" x "+str(self.overcopter.getY())+" Y ")
+			self.overcopter.set_x(self.overcopter,1)
 			
-		if(self.overcopter.getX()==10) and (self.overcopter.getY()==-10) and (self.overcopter_step==0):
-			self.overcopter_step=1
+			if(self.overcopter.getX()==10) and (self.overcopter.getY()==-10) and (self.overcopter_step==0):
+				self.overcopter_step=1
+				
+			
 			return task.again
 			
 		
 		#going in first corner
-		while(self.overcopter.getY()<10) and (self.overcopter.getX()==-10) and (self.overcopter_step==1):
-			self.speak.output("step 2")
+		if(self.overcopter.getY()<=10) and (self.overcopter.getX()==-10) and (self.overcopter_step==1):
+			print(str(self.overcopter.getX())+" x "+str(self.overcopter.getY())+" Y ")
 			self.overcopter.set_x(self.overcopter,1)
+			if(self.overcopter.getY()==10) and (self.overcopter.getX()==10) and (self.overcopter_step==1):
+				self.overcopter_step=2
+				
 			
-		if(self.overcopter.getY()==10) and (self.overcopter.getX()==-10) and (self.overcopter_step==1):
-			self.overcopter_step=2
 			return task.again
 			
 		
 		#last left corner
-		while(self.overcopter.getX()>-10) and (self.overcopter.getY()==10) and (self.overcopter_step==2):
+		if(self.overcopter.getX()>-10) and (self.overcopter.getY()==10) and (self.overcopter_step==2):
 			self.speak.output("step 3")
 			self.overcopter.set_x(self.overcopter,-1)
 			if(self.overcopter.getZ()>16):
 				self.overcopter.set_z(self.overcopter,-1)
 				
+			if(self.overcopter.getX()==-10) and (self.overcopter.getY()==10) and (self.overcopter_step==2):
+				self.overcopter_step=3
+				
 			
-		if(self.overcopter.getX()==-10) and (self.overcopter.getY()==10) and (self.overcopter_step==2):
-			self.overcopter_step=3
 			return task.again
 			
 		
 		#aproaching of landing point
-		if(self.overcopter.getX()==10) and (self.overcopter.getY()==10) and (self.overcopter_step==3):
+		if(self.overcopter.getX()==-10) and (self.overcopter.getY()==10) and (self.overcopter_step==3):
 			self.speak.output("step 4")
 			self.overcopter.set_x(self.overcopter,1)
-			task.pause(1)
-			return task.again
+			if(self.overcopter.getPos()==first):
+				self.overcopter_step=4
+				
 			
-		
-		if(self.overcopter.getPos()==first):
-			self.overcopter_step=1
-			return task.again
-		elif(self.overcopter.getPos()==next):
-			self.overcopter_step=2
 			return task.again
 			
 		
 	
 	def move_bird(self,task):
+		#task.setDelay(1)
+		
 		if(self.bird_direction=="r"):
-			self.bird.set_x(self.bird,1)
+			self.bird.set_x(self.bird,self.bird_speed)
 		if(self.bird_direction=="l"):
-			self.bird.set_x(self.bird,-1)
+			self.bird.set_x(self.bird,-self.bird_speed)
 			
 		
 		if(self.bird.getX()>10):
 			self.birdland_sound.play()
 			self.bird.setPos(9,0,self.bird.getZ()-1)
 			self.bird_direction="l"
+			self.superseed_used=False
 		if(self.bird.getX()<-10):
 			self.birdland_sound.play()
 			self.bird.setPos(-9,0,self.bird.getZ()-1)
 			self.bird_direction="r"
-			
+			self.superseed_used=False
 		
 		if(int(self.bird.getZ())<=0):
 			self.speak.output("game over.")
 			self.taskMgr.add(self.gameover,"overing")
-			return task.done
+			return task.exit
 			
-		return Task.again
-		
+		return task.again
 	
 	#unflationing the baloon if the space key is pressed
 	def unflatebaloon(self,task):
@@ -287,16 +327,17 @@ class Game(ShowBase):
 				
 			self.blow_sound.play()
 			waitTime=self.blow_sound.length()+(self.baloon_unflated/100)
-			self.taskMgr.doMethodLater(waitTime,self.unflatebaloon,"blowagain")
+			task.setDelay(waitTime)
 			task.pause(waitTime)
 			self.baloon_unflated+=randrange(10,25)
 			
 			self.baloon_unflating=False
-			return task.done
+			return task.again
 			
 		
 		if(self.baloon_in_mouth==True) and (self.baloon_unflating==False) and (self.baloon_unflated>100) and (self.baloon_spawned==True):
 			self.blow_sound.stop()
+			self.blow_sound.setPlayRate(1)
 			self.explode_sound.play()
 			self.baloon_unflated=0
 			self.baloon_in_mouth=False
@@ -305,13 +346,9 @@ class Game(ShowBase):
 			self.baloon_spawned=False
 			task.pause(3)
 			self.baloon_spawned=True
-			return task.exit
-			
-		
-		if(self.baloon_in_mouth==False):
-			self.blow_sound.stop()
 			return task.done
 			
+		
 		
 	
 	def flybaloon(self,task):
@@ -319,6 +356,7 @@ class Game(ShowBase):
 			self.speak.output("lift off")
 			self.baloon_spawned=False
 			self.blow_sound.stop()
+			self.blow_sound.setPlayRate(1)
 			self.baloon_flying=True
 			self.unflating_sound.play()
 			self.taskMgr.doMethodLater(0,self.flybaloon,"flying")
@@ -326,14 +364,17 @@ class Game(ShowBase):
 			
 		
 		if(self.baloon_flying==True) and (self.baloon_unflated>0):
-			self.speak.output("the rocket is on his way")
 			self.baloon.set_z(self.baloon,1)
+			if(self.baloon.getX()==self.bird.getX()):
+				self.speak.output("bump! the balloon push the bird up!")
+				self.bird.setZ(+1)
+				
 			self.baloon_unflated-=1
 			return task.again
 			
 		
 		if(self.baloon_unflated<=0) and (self.baloon_flying==True):
-			self.speak.output("flight ending normally.")
+			self.speak.output("Flap! The balloon fall back in the graces!")
 			self.baloon_flying=False
 			self.unflating_sound.stop()
 			self.baloon.setPos(0,0,0)
@@ -348,8 +389,9 @@ class Game(ShowBase):
 			self.bird_is_eating=True
 			self.catch_sound.play()
 			self.score+=1
-			self.taskMgr.doMethodLater(self.catch_sound.length(),self.eat_seed,"haveyoufinish")
-			return Task.done
+			task.setDelay(self.catch_sound.length())
+			#self.taskMgr.doMethodLater(self.catch_sound.length(),self.eat_seed,"haveyoufinish")
+			return Task.again
 		else:
 			self.bird_is_eating=False
 			return task.done
@@ -415,11 +457,18 @@ class Game(ShowBase):
 				self.taskMgr.add(self.flybaloon,"flying")
 				
 			
-		if(self.keyMap["down"]==True) and (self.superseed_armed==False) and (self.overcopter==None):
+		if(self.keyMap["down"]==True) and (self.superseed_armed==False) and (self.overcopter==None) and (self.superseed_used==False):
 			self.speak.output("super seed loaded")
 			self.superseed_armed=True
 			self.superload_sound.play()
 			
+		if(self.keyMap["up"]==True) and (self.superseed_armed==True) and (self.overcopter==None) and (self.superseed_used==False):
+			self.superseed_used=True
+			self.superthrow_sound.play()
+			self.superseed=NodePath("superseed")
+			self.superseed.reparentTo(self.env)
+			self.superseed.setPos(0,0,0)
+			self.superseed_armed=False
 		
 	
 

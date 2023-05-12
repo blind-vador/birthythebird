@@ -1,4 +1,3 @@
-#aaaaaaaaaa
 import importlib, os, subprocess, sys, time
 
 libs=["panda3d","pyttsx3","accessible_output2"]
@@ -76,7 +75,8 @@ class Game(ShowBase):
 		"up":False,
 		"baloon" : False,
 		"getbirdpos":False,
-		"telscore":False
+		"telscore":False,
+		"telbaloon":False
 		}
 		
 		self.accept("arrow_right", self.updateKeyMap, ["right", True])
@@ -94,6 +94,8 @@ class Game(ShowBase):
 		self.accept("p-up",self.updateKeyMap,["getbirdpos",False])
 		self.accept("s",self.updateKeyMap,["telscore",True])
 		self.accept("s-up",self.updateKeyMap,["telscore",False])
+		self.accept("b",self.updateKeyMap,["telbaloon",True])
+		self.accept("b-up",self.updateKeyMap,["telbaloon",False])
 		
 		#modeling the univers where the bird should fly.
 		self.env = self.loader.loadModel("models/environment")
@@ -101,10 +103,21 @@ class Game(ShowBase):
 		self.env.setScale(0.25, 0.25, 0.25)
 		self.env.setPos(-10,42,0)
 		
+		#adding the river in the env
+		self.riverPoint1=NodePath("river_pixel1")
+		self.riverPoint1.reparentTo(self.env)
+		self.riverPoint1.setPos(10,10,0)
+		self.riverPoint2=NodePath("river_pixel2")
+		self.riverPoint2.reparentTo(self.env)
+		self.riverPoint2.setPos(0,90,0)
+		self.riverPoint3=NodePath("river_pixel3")
+		self.riverPoint3.reparentTo(self.env)
+		self.riverPoint3.setPos(-10,10,0)
+		
 		#creating the bird with his coordinates.
 		self.bird=NodePath("Bird")
 		self.bird.reparentTo(self.env)
-		self.bird.setPos(Vec3(-9, 0, 1))
+		self.bird.setPos(Vec3(-9, 0, 10))
 		self.bird_direction="r"
 		self.bird_is_eating=False
 		self.bird_speed=0.5
@@ -112,13 +125,21 @@ class Game(ShowBase):
 		#importing the required noises.
 		#background noise
 		self.embi_sound=self.audio3d.loadSfx('embi.wav')
-		self.river_sound=self.audio3d.loadSfx('river.wav')
 		self.embi_sound.setLoop(True)
 		self.embi_sound.play()
 		self.embi_sound.setVolume(0.2)
+		self.river_sound=self.audio3d.loadSfx('river.wav')
+		self.river2_sound=self.audio3d.loadSfx('river.wav')
+		self.river3_sound=self.audio3d.loadSfx('river.wav')
 		self.river_sound.setLoop(True)
-		self.river_sound.setVolume(0.1)
+		self.river2_sound.setLoop(True)
+		self.river3_sound.setLoop(True)
+		self.audio3d.attachSoundToObject(self.river_sound,self.riverPoint1)
+		self.audio3d.attachSoundToObject(self.river2_sound,self.riverPoint2)
+		self.audio3d.attachSoundToObject(self.river3_sound,self.riverPoint3)
 		self.river_sound.play()
+		self.river2_sound.play()
+		self.river3_sound.play()
 		
 		#throwing a seed:
 		self.throw_sound=self.audio3d.loadSfx('seed.wav')
@@ -148,6 +169,9 @@ class Game(ShowBase):
 		#baloon too much blowed, exploded
 		self.explode_sound=self.audio3d.loadSfx('explode.wav')
 		
+		#touching the plastics bag of baloon to watch how much are inside
+		self.baloonbag_sound=self.audio3d.loadSfx('baloonbag.wav')
+		
 		#game over cinematic
 		self.gameover_sound=self.audio3d.loadSfx('gameover.wav')
 		self.pgl_sound=self.audio3d.loadSfx('pgl.wav')
@@ -169,6 +193,7 @@ class Game(ShowBase):
 		
 		#linking sound emited by the player to his cordinates
 		self.audio3d.attachSoundToObject(self.throw_sound, self.player)
+		self.audio3d.attachSoundToObject(self.baloonbag_sound, self.player)
 		self.audio3d.attachSoundToObject(self.superthrow_sound, self.player)
 		self.audio3d.attachSoundToObject(self.superload_sound, self.player)
 		self.audio3d.attachSoundToObject(self.miss_sound, self.player)
@@ -206,6 +231,9 @@ class Game(ShowBase):
 		
 		#determine the speed of the baloon
 		self.baloon_speed=1
+		
+		#determine how much baloon the player got in his bag when he haven't any more he can't push the bird up
+		self.baloon_bag=10
 		
 		#linking the sound of the unflating baloon to his coordinate
 		self.audio3d.attachSoundToObject(self.unflating_sound, self.baloon)
@@ -293,7 +321,7 @@ class Game(ShowBase):
 		
 	
 	def move_bird(self,task):
-		#task.setDelay(1)
+		task.setDelay(1)
 		
 		if(self.bird_direction=="r"):
 			self.bird.set_x(self.bird,self.bird_speed)
@@ -311,6 +339,7 @@ class Game(ShowBase):
 			self.bird.setPos(-9,0,self.bird.getZ()-1)
 			self.bird_direction="r"
 			self.superseed_used=False
+			
 		
 		if(int(self.bird.getZ())<=0):
 			self.speak.output("game over.")
@@ -345,30 +374,30 @@ class Game(ShowBase):
 			self.baloon_unflating=False
 			self.baloon_flying=False
 			self.baloon_spawned=False
+			self.baloon_bag-=1
 			task.pause(3)
 			self.baloon_spawned=True
 			return task.done
 			
 		
-		
 	
 	def flybaloon(self,task):
 		if(self.baloon_in_mouth==False) and (self.baloon_unflating==False) and (self.baloon_unflated>0) and (self.baloon_flying==False):
+			self.baloon_bag-=1
 			self.speak.output("lift off")
 			self.baloon_spawned=False
 			self.blow_sound.stop()
 			self.blow_sound.setPlayRate(1)
 			self.baloon_flying=True
 			self.unflating_sound.play()
-			self.taskMgr.doMethodLater(0,self.flybaloon,"flying")
-			return task.done
+			return task.cont
 			
 		
 		if(self.baloon_flying==True) and (self.baloon_unflated>0):
 			self.baloon.set_z(self.baloon,1)
-			if(self.baloon.getX()==self.bird.getX()):
+			if(self.baloon.getX()==self.bird.getX()) and (self.baloon.getZ()==self.bird.getZ()):
 				self.speak.output("bump! the balloon push the bird up!")
-				self.bird.setZ(+1)
+				self.bird.setZ(self.bird,+1)
 				
 			self.baloon_unflated-=1
 			return task.again
@@ -412,28 +441,6 @@ class Game(ShowBase):
 			
 		
 	
-	def blowing(self):
-		self.baloon_unflated=self.baloon_unflated+1
-		if(self.baloon_unflated>100):
-			self.explode_sound.play()
-			self.baloon_unflated=0
-			
-		
-	
-	def releazbaloon(self):
-		flightduration=2*(self.baloon_unflated/100)**2
-		elapsed_time=globalClock.getFrameTime() - self.start_time
-		self.unflating_sound.play()
-		if(elapsed_time<time_of_flight):
-			self.baloon.setPos(self.baloon.getX(), self.baloon.getY(), self.baloon.getZ()+1)
-			return Task.again
-		else:
-			self.deflating_sound.stop()
-			self.baloon_unflated=0
-			return Task.done
-			
-		
-	
 	def updateKeyMap(self, controlName, controlState):
 		self.keyMap[controlName] = controlState
 		
@@ -448,7 +455,7 @@ class Game(ShowBase):
 		if(self.keyMap["telscore"]==True):
 			self.speak.output("Your score is : "+str(self.score)+" points")
 			
-		if(self.keyMap["baloon"]==True) and (self.baloon_in_mouth==False) and (self.baloon_unflating==False) and (self.overcopter==None):
+		if(self.keyMap["baloon"]==True) and (self.baloon_in_mouth==False) and (self.baloon_unflating==False) and (self.overcopter==None) and (self.baloon_bag>0):
 			self.baloon_in_mouth=True
 			self.taskMgr.add(self.unflatebaloon, "baloon_unflatingtsk")
 		if(self.keyMap["baloon"]==False) and (self.overcopter==None):
@@ -470,6 +477,10 @@ class Game(ShowBase):
 			self.superseed.reparentTo(self.env)
 			self.superseed.setPos(0,0,0)
 			self.superseed_armed=False
+		if(self.keyMap["telbaloon"]==True) and (self.overcopter==None):
+			self.baloonbag_sound.play()
+			self.speak.output("you have "+str(self.baloon_bag)+" balloons in your bag.")
+			
 		
 	
 

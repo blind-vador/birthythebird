@@ -104,15 +104,26 @@ class Game(ShowBase):
 		self.env.setPos(-10,42,0)
 		
 		#adding the river in the env
+		
+		#first pixel of river, totaly on right, the entrence of the river in the map
 		self.riverPoint1=NodePath("river_pixel1")
 		self.riverPoint1.reparentTo(self.env)
-		self.riverPoint1.setPos(10,10,0)
+		self.riverPoint1.setPos(10,40,0)
+		
+		#second point on the river, to feed the stereo, around 5 a bit on the right to link betwin the entrence and the next part.
 		self.riverPoint2=NodePath("river_pixel2")
 		self.riverPoint2.reparentTo(self.env)
-		self.riverPoint2.setPos(0,90,0)
+		self.riverPoint2.setPos(6,40,0)
+		
+		#next point a bit on the left from the center to feed betwin the midle and the end of the river
 		self.riverPoint3=NodePath("river_pixel3")
 		self.riverPoint3.reparentTo(self.env)
-		self.riverPoint3.setPos(-10,10,0)
+		self.riverPoint3.setPos(-6,40,0)
+		
+		#last point of the river, totaly on left, a small waterfall
+		self.riverPoint4=NodePath("river_pixel4")
+		self.riverPoint4.reparentTo(self.env)
+		self.riverPoint4.setPos(-15,40,0)
 		
 		#creating the bird with his coordinates.
 		self.bird=NodePath("Bird")
@@ -128,18 +139,34 @@ class Game(ShowBase):
 		self.embi_sound.setLoop(True)
 		self.embi_sound.play()
 		self.embi_sound.setVolume(0.2)
-		self.river_sound=self.audio3d.loadSfx('river.wav')
-		self.river2_sound=self.audio3d.loadSfx('river.wav')
-		self.river3_sound=self.audio3d.loadSfx('river.wav')
+		
+		#sound for the river in the decore
+		self.river_sound=self.audio3d.loadSfx('riverright.wav')
+		self.river2_sound=self.audio3d.loadSfx('rivermidle.wav')
+		self.river3_sound=self.audio3d.loadSfx('rivermidleft.wav')
+		self.river4_sound=self.audio3d.loadSfx('riverleft.wav')
+		
+		#activating the looping mod
 		self.river_sound.setLoop(True)
 		self.river2_sound.setLoop(True)
 		self.river3_sound.setLoop(True)
+		self.river4_sound.setLoop(True)
+		
+		#linking sound ot audio
 		self.audio3d.attachSoundToObject(self.river_sound,self.riverPoint1)
 		self.audio3d.attachSoundToObject(self.river2_sound,self.riverPoint2)
 		self.audio3d.attachSoundToObject(self.river3_sound,self.riverPoint3)
+		self.audio3d.attachSoundToObject(self.river4_sound,self.riverPoint4)
+		
+		#seting volume to evoid smashing the background noise
+		self.river_sound.setVolume(0.5)
+		self.river2_sound.setVolume(0.8)
+		self.river3_sound.setVolume(0.9)
+		self.river4_sound.setVolume(0.6)
 		self.river_sound.play()
 		self.river2_sound.play()
 		self.river3_sound.play()
+		self.river4_sound.play()
 		
 		#throwing a seed:
 		self.throw_sound=self.audio3d.loadSfx('seed.wav')

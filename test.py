@@ -113,7 +113,7 @@ class Game(ShowBase):
 		#second point on the river, to feed the stereo, around 5 a bit on the right to link betwin the entrence and the next part.
 		self.riverPoint2=NodePath("river_pixel2")
 		self.riverPoint2.reparentTo(self.env)
-		self.riverPoint2.setPos(6,40,0)
+		self.riverPoint2.setPos(6,25,0)
 		
 		#next point a bit on the left from the center to feed betwin the midle and the end of the river
 		self.riverPoint3=NodePath("river_pixel3")
@@ -180,6 +180,7 @@ class Game(ShowBase):
 		#throwing the seed in the wrong direction:
 		self.miss_sound=self.audio3d.loadSfx('miss.wav')
 		self.supermiss_sound=self.audio3d.loadSfx('supermiss.wav')
+		self.supermiss_sound.setVolume(20)
 		
 		#loop of the bird:
 		self.bird_sound=self.audio3d.loadSfx('bird.wav')
@@ -211,12 +212,11 @@ class Game(ShowBase):
 		self.player=NodePath("player")
 		self.player.reparentTo(self.env)
 		self.player.setPos(Vec3(0, 0, 0))
+		
 		#initing the base camera to the players cordinates.
 		base.camera.setPos(0, 0, 0)
 		base.camera.setHpr(0, 0, 0)
 		base.camera.reparentTo(self.player)
-		#initing the score
-		self.score=0
 		
 		#linking sound emited by the player to his cordinates
 		self.audio3d.attachSoundToObject(self.throw_sound, self.player)
@@ -257,7 +257,7 @@ class Game(ShowBase):
 		self.baloon_spawned=True
 		
 		#determine the speed of the baloon
-		self.baloon_speed=1
+		self.baloon_speed=0.3
 		
 		#determine how much baloon the player got in his bag when he haven't any more he can't push the bird up
 		self.baloon_bag=10
@@ -269,7 +269,13 @@ class Game(ShowBase):
 		self.taskMgr.doMethodLater(1,self.move_bird, "movebird")
 		self.bird_sound.play()
 		
+		
+		#basic variables of the games like game over, score, status of the superseed...
+		self.score=0
 		self.overcopter=None
+		
+		self.superseed=None
+		self.superseed_fase=0
 		self.superseed_armed=False
 		self.superseed_used=False
 	
@@ -367,6 +373,11 @@ class Game(ShowBase):
 			self.bird_direction="r"
 			self.superseed_used=False
 			
+		if(self.superseed!=None) and (self.bird.getX()>=-5) and (self.bird.getX()<=5):
+			if(self.bird.getZ()<=self.superseed.getZ()) or (self.bird.getZ()-5<=self.superseed.getZ()) or (self.bird.getZ()+5<=self.superseed.getZ()):
+				self.supercatch_sound.play()
+				
+			
 		
 		if(int(self.bird.getZ())<=0):
 			self.speak.output("game over.")
@@ -441,6 +452,54 @@ class Game(ShowBase):
 			
 		
 	
+	def flysuperseed(self,task):
+		#task.setDelay(1)
+		if(self.superseed.getZ()<=15) and (self.superseed_fase==1):
+			print("climbing up is at "+str(self.superseed.getZ()))
+			self.superseed.setZ(self.superseed,+0.5)
+			return task.again
+		elif(self.superseed.getZ()>=15) and (self.superseed_fase==1):
+			print("geting in fase 2")
+			self.superseed_fase=2
+			return task.again
+		
+		if(self.superseed.getZ()==15) or (self.superseed.getZ()>0) and (self.superseed_fase==2):
+			print("falling down is at "+str(self.superseed.getZ()))
+			self.superseed.setZ(self.superseed,-0.5)
+			return task.again
+		elif(self.superseed.getZ()==0) and (self.superseed_fase==2):
+			print("geting in fase 3")
+			self.superseed_fase=3
+			return task.again
+			
+		
+		if(self.superseed.getZ()==0) and (self.superseed_fase==3):
+			self.speak.output("The hevy seed sadly fall back on the ground, bounsing back away... well done, nice shot!")
+			self.superseed.setZ(self.superseed,1)
+			self.superseed_fase=4
+			return task.again
+		
+		if(self.superseed.getY()<self.riverPoint2.getY()) and (self.superseed_fase==4):
+			self.superseed.setY(self.superseed,1)
+			print("flying to the river, is actually at "+str(self.superseed.getY()))
+			return task.again
+		elif(self.superseed.getY()==self.riverPoint2.getY()) and (self.superseed_fase==4):
+			print("ready to fall in river")
+			self.superseed_fase=5
+			return task.again
+			
+		
+		if(self.superseed_fase==5):
+			print("super seed falled in watter")
+			self.supermiss_sound.play()
+			task.pause(self.supermiss_sound.length())
+			self.superseed=None
+			self.superseed_fase=0
+			
+			return task.exit
+			
+		
+	
 	def eat_seed(self,task):
 		if(self.bird_is_eating==False):
 			self.bird_is_eating=True
@@ -503,6 +562,8 @@ class Game(ShowBase):
 			self.superseed=NodePath("superseed")
 			self.superseed.reparentTo(self.env)
 			self.superseed.setPos(0,0,0)
+			self.superseed_fase=1
+			self.taskMgr.add(self.flysuperseed,"flyseed")
 			self.superseed_armed=False
 		if(self.keyMap["telbaloon"]==True) and (self.overcopter==None):
 			self.baloonbag_sound.play()

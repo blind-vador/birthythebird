@@ -1,45 +1,17 @@
-import importlib, os, subprocess, sys, time
-
-libs=["panda3d","pyttsx3","accessible_output2"]
-
-for lib in libs:
-	try:
-		print(f"Importing module {lib}")
-		importlib.import_module(lib)
-		
-		
-		print(f"Module {lib} imported successfully.")
-	except ImportError as e:
-		print(f"Missing library: {e.name}. Installing it for you right now...")
-		subprocess.check_call(["pip", "install", "--user", e.name])
-		importlib.invalidate_caches()
-		print("Waiting for library to be installed...")
-		for i in range(10):
-			try:
-				importlib.import_module(e.name)
-				break
-			except ImportError:
-				time.sleep(3)
-		else:
-			raise Exception("Unable to import library after installation")
-			
-		
-	
-
-print("All required libraries imported successfully.")
-
-from vocaliser import *
+import time, panda3d, sys
+from src.vocaliser import *
 from direct.interval.LerpInterval import LerpPosInterval
-from panda3d.core import Point3
 from direct.task import Task
-from panda3d.core import NodePath, Vec3
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import WindowProperties
-from panda3d.core import load_prc_file_data
 from direct.showbase.Audio3DManager import Audio3DManager
 from direct.interval.IntervalGlobal import *
+from panda3d.core import WindowProperties
+from panda3d.core import load_prc_file_data
+from panda3d.core import NodePath, Vec3
+from panda3d.core import Point3
 from panda3d.core import AudioManager
 from random import randrange
+
 
 class Game(ShowBase):
 	def __init__(self):
@@ -108,43 +80,43 @@ class Game(ShowBase):
 		#first pixel of river, totaly on right, the entrence of the river in the map
 		self.riverPoint1=NodePath("river_pixel1")
 		self.riverPoint1.reparentTo(self.env)
-		self.riverPoint1.setPos(10,40,0)
+		self.riverPoint1.setPos(15,60,0)
 		
 		#second point on the river, to feed the stereo, around 5 a bit on the right to link betwin the entrence and the next part.
 		self.riverPoint2=NodePath("river_pixel2")
 		self.riverPoint2.reparentTo(self.env)
-		self.riverPoint2.setPos(6,25,0)
+		self.riverPoint2.setPos(8,60,0)
 		
 		#next point a bit on the left from the center to feed betwin the midle and the end of the river
 		self.riverPoint3=NodePath("river_pixel3")
 		self.riverPoint3.reparentTo(self.env)
-		self.riverPoint3.setPos(-6,40,0)
+		self.riverPoint3.setPos(-8,60,0)
 		
 		#last point of the river, totaly on left, a small waterfall
 		self.riverPoint4=NodePath("river_pixel4")
 		self.riverPoint4.reparentTo(self.env)
-		self.riverPoint4.setPos(-15,40,0)
+		self.riverPoint4.setPos(-15,60,0)
 		
 		#creating the bird with his coordinates.
 		self.bird=NodePath("Bird")
 		self.bird.reparentTo(self.env)
-		self.bird.setPos(Vec3(-9, 0, 10))
+		self.bird.setPos(-9, 0, 10)
 		self.bird_direction="r"
 		self.bird_is_eating=False
 		self.bird_speed=0.5
 		
 		#importing the required noises.
 		#background noise
-		self.embi_sound=self.audio3d.loadSfx('embi.wav')
+		self.embi_sound=self.audio3d.loadSfx('src/sound/embi.wav')
 		self.embi_sound.setLoop(True)
 		self.embi_sound.play()
 		self.embi_sound.setVolume(0.2)
 		
 		#sound for the river in the decore
-		self.river_sound=self.audio3d.loadSfx('riverright.wav')
-		self.river2_sound=self.audio3d.loadSfx('rivermidle.wav')
-		self.river3_sound=self.audio3d.loadSfx('rivermidleft.wav')
-		self.river4_sound=self.audio3d.loadSfx('riverleft.wav')
+		self.river_sound=self.audio3d.loadSfx('src/sound/riverright.wav')
+		self.river2_sound=self.audio3d.loadSfx('src/sound/rivermidle.wav')
+		self.river3_sound=self.audio3d.loadSfx('src/sound/rivermidleft.wav')
+		self.river4_sound=self.audio3d.loadSfx('src/sound/riverleft.wav')
 		
 		#activating the looping mod
 		self.river_sound.setLoop(True)
@@ -158,54 +130,49 @@ class Game(ShowBase):
 		self.audio3d.attachSoundToObject(self.river3_sound,self.riverPoint3)
 		self.audio3d.attachSoundToObject(self.river4_sound,self.riverPoint4)
 		
-		#seting volume to evoid smashing the background noise
-		self.river_sound.setVolume(0.5)
-		self.river2_sound.setVolume(0.8)
-		self.river3_sound.setVolume(0.9)
-		self.river4_sound.setVolume(0.6)
 		self.river_sound.play()
 		self.river2_sound.play()
 		self.river3_sound.play()
 		self.river4_sound.play()
 		
 		#throwing a seed:
-		self.throw_sound=self.audio3d.loadSfx('seed.wav')
-		self.superthrow_sound=self.audio3d.loadSfx('superthrow.wav')
-		self.superload_sound=self.audio3d.loadSfx('superload.wav')
+		self.throw_sound=self.audio3d.loadSfx('src/sound/seed.wav')
+		self.superthrow_sound=self.audio3d.loadSfx('src/sound/superthrow.wav')
+		self.superload_sound=self.audio3d.loadSfx('src/sound/superload.wav')
 		
 		#bird eat a seed:
-		self.catch_sound=self.audio3d.loadSfx('catch.wav')
-		self.supercatch_sound=self.audio3d.loadSfx('supercatch.wav')
+		self.catch_sound=self.audio3d.loadSfx('src/sound/catch.wav')
+		self.supercatch_sound=self.audio3d.loadSfx('src/sound/supercatch.wav')
 		
 		#throwing the seed in the wrong direction:
-		self.miss_sound=self.audio3d.loadSfx('miss.wav')
-		self.supermiss_sound=self.audio3d.loadSfx('supermiss.wav')
+		self.miss_sound=self.audio3d.loadSfx('src/sound/miss.wav')
+		self.supermiss_sound=self.audio3d.loadSfx('src/sound/supermiss.wav')
 		self.supermiss_sound.setVolume(20)
 		
 		#loop of the bird:
-		self.bird_sound=self.audio3d.loadSfx('bird.wav')
-		self.birdland_sound=self.audio3d.loadSfx('birdland.wav')
-		self.birdsleeping_sound=self.audio3d.loadSfx('birdsleeping.wav')
+		self.bird_sound=self.audio3d.loadSfx('src/sound/bird.wav')
+		self.birdland_sound=self.audio3d.loadSfx('src/sound/birdland.wav')
+		self.birdsleeping_sound=self.audio3d.loadSfx('src/sound/birdsleeping.wav')
 		
 		
 		#baloon blowing up:
-		self.blow_sound=self.audio3d.loadSfx('blowup.wav')
+		self.blow_sound=self.audio3d.loadSfx('src/sound/blowup.wav')
 		
 		#baloon unflating
-		self.unflating_sound=self.audio3d.loadSfx('unflating.wav')
+		self.unflating_sound=self.audio3d.loadSfx('src/sound/unflating.wav')
 		
 		#baloon too much blowed, exploded
-		self.explode_sound=self.audio3d.loadSfx('explode.wav')
+		self.explode_sound=self.audio3d.loadSfx('src/sound/explode.wav')
 		
 		#touching the plastics bag of baloon to watch how much are inside
-		self.baloonbag_sound=self.audio3d.loadSfx('baloonbag.wav')
+		self.baloonbag_sound=self.audio3d.loadSfx('src/sound/baloonbag.wav')
 		
 		#game over cinematic
-		self.gameover_sound=self.audio3d.loadSfx('gameover.wav')
-		self.pgl_sound=self.audio3d.loadSfx('pgl.wav')
-		self.pgf_sound=self.audio3d.loadSfx('pgf.wav')
-		self.pgb_sound=self.audio3d.loadSfx('pgb.wav')
-		self.pgh_sound=self.audio3d.loadSfx('pgh.wav')
+		self.gameover_sound=self.audio3d.loadSfx('src/sound/gameover.wav')
+		self.pgl_sound=self.audio3d.loadSfx('src/sound/pgl.wav')
+		self.pgf_sound=self.audio3d.loadSfx('src/sound/pgf.wav')
+		self.pgb_sound=self.audio3d.loadSfx('src/sound/pgb.wav')
+		self.pgh_sound=self.audio3d.loadSfx('src/sound/pgh.wav')
 		
 		
 		#placing the player in the midle of the univers.
@@ -562,6 +529,7 @@ class Game(ShowBase):
 			self.superseed=NodePath("superseed")
 			self.superseed.reparentTo(self.env)
 			self.superseed.setPos(0,0,0)
+			self.audio3d.attachSoundToObject(self.supermiss_sound,self.superseed)
 			self.superseed_fase=1
 			self.taskMgr.add(self.flysuperseed,"flyseed")
 			self.superseed_armed=False
@@ -571,7 +539,3 @@ class Game(ShowBase):
 			
 		
 	
-
-
-game = Game()
-game.run()
